@@ -10,3 +10,11 @@ Streamlit allows for quick and easy slider creation with minimal code but tends 
 - Streamlit: [slider - Streamlit](./slider%20-%20Streamlit.py)
 - Taipy: [slider - Taipy](./slider%20-%20Taipy.py)
 
+# DataFrame and Pie Chart
+Streamlit simplifies the creation of DataFrames and pie charts with minimal code using its built-in components and Plotly for visualization, offering an interactive user experience. Taipy, on the other hand, uses a markdown-like syntax for layout, with built-in chart support, allowing for more control over design and performance. While Streamlit is perfect for quick visualizations and rapid development, Taipy excels in creating more customized and performant applications.
+
+![DataFrame and Pie Chart](assets/dataframe_piechart.png)
+
+## Code:
+- Streamlit: [dataframe_piechart - Streamlit](./dataframe_piechart_Streamlit.py)
+- Taipy: [dataframe_piechart - Taipy](./dataframe_piechart_Taipy.py)
