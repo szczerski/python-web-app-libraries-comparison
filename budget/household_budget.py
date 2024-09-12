@@ -15,6 +15,46 @@ st.set_page_config(page_title="Household Budget App")
 
 # Define all functions at the beginning of the script
 
+
+def add_new_item():
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("➕ Add New Item")
+        product = st.text_input("Product")
+        amount = st.number_input("Amount", min_value=0.0, step=0.01)
+        date = st.date_input("Date", value=datetime.now().date(), key="new_item_date_input")
+
+        # Category selection for custom products
+        category = get_category(product)
+        if product and not category:
+            category = st.selectbox("Category", options=list(st.session_state.product_categories.keys()) + ["Other"])
+
+        add_item = st.button("Add Item")
+
+        if add_item and product:
+            if not category:
+                category = "Other"
+            new_item = {"Product": product, "Amount": amount, "Category": category, "Date": date}
+            st.session_state.budget_items.append(new_item)
+            df = pd.DataFrame(st.session_state.budget_items)
+            save_budget_data(df)
+        
+        # Add new product to category if it's not already there
+        if category != "Other":
+            if category not in st.session_state.product_categories:
+                st.session_state.product_categories[category] = []
+            if product.lower() not in st.session_state.product_categories[category]:
+                st.session_state.product_categories[category].append(product.lower())
+                save_product_categories(st.session_state.product_categories)
+        
+        st.success(f"Item added successfully! Category: {category}")
+        # Reset the product input
+        product = ""
+
+    with col2:
+        display_budget_items()
+
 def load_budget_data():
     if os.path.exists(BUDGET_CSV):
         df = pd.read_csv(BUDGET_CSV)
@@ -154,9 +194,19 @@ def set_savings_goal():
 
 def add_to_savings():
     st.subheader("Add to Savings")
-    savings_amount = st.number_input("Amount to add to savings", min_value=0.0, step=0.01, key="savings_amount_input")
-    savings_date = st.date_input("Date", value=datetime.now().date(), key="savings_date_input")
-    if st.button("Add to Savings", key="add_savings_button"):
+    
+    col1, col2= st.columns(2)
+
+    with col1:
+        savings_amount = st.number_input("Amount to add to savings", min_value=0.0, step=0.01, key="savings_amount_input")
+
+    with col2:
+        savings_date = st.date_input("Date", value=datetime.now().date(), key="savings_date_input")
+
+
+    add_savings_button = st.button("Add to Savings", key="add_savings_button")
+
+    if add_savings_button:
         if savings_amount > 0:
             new_savings = {
                 "Product": "Savings", 
@@ -228,9 +278,15 @@ def display_savings_goal_progress():
         if goal['amount'] > 0:
             progress = min((total_savings / goal['amount']), 1.0)  # Ensure progress is between 0 and 1
             st.progress(progress)
-            st.write(f"Saved: ${total_savings:.2f} / ${goal['amount']:.2f}")
-            days_left = (goal['date'] - datetime.now().date()).days
-            st.write(f"Days left to reach goal: {days_left}")
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.write(f"Saved: ${total_savings:.2f} / ${goal['amount']:.2f}")
+            with col2:
+                st.write(f"Target Date: {st.session_state.savings_goal['date']}")
+            with col3:
+                days_left = (goal['date'] - datetime.now().date()).days
+                st.write(f"Days left to reach goal: {days_left}")
             
             if total_savings >= goal['amount']:
                 st.success("Congratulations! You've reached your savings goal!")
@@ -268,9 +324,17 @@ def manage_spending_restrictions():
 def display_budget_items():
     if st.session_state.budget_items:
         df = pd.DataFrame(st.session_state.budget_items)
-        df['Date'] = pd.to_datetime(df['Date'])
+        df['Date'] = pd.to_datetime(df['Date']).dt.date
+        # df['Amount'] = df['Amount'].round(2)
+        st.dataframe(
+            df.style
+            .format({
+                "Amount": "${:.2f}",
+                "Date": lambda x: x.strftime("%Y-%m-%d")
+            })
+        )
         
-        st.subheader("Budget Items")
+        st.subheader("📜 Budget Items History")
         
         # Function to determine row color
         def highlight_row(row):
@@ -314,10 +378,17 @@ def display_budget_vs_actual():
         monthly_spending = df[df['Date'] >= current_month]['Amount'].sum()
         remaining_budget = st.session_state.monthly_budget - monthly_spending
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         col1.metric("Monthly Budget", f"${st.session_state.monthly_budget:.2f}")
         col2.metric("Spent", f"${monthly_spending:.2f}")
         col3.metric("Remaining", f"${remaining_budget:.2f}")
+        
+        # Create a progress bar to show budget remaining
+        progress = remaining_budget / st.session_state.monthly_budget
+        col4.text(f"Budget Remaing")
+        col4.progress(progress, text=f"{progress:.1%}")
+    st.markdown('---')
+        
 
 def display_pie_chart():
     if st.session_state.budget_items:
@@ -393,64 +464,14 @@ add_recurring_expense()
 set_savings_goal()
 manage_spending_restrictions()
 
-# Display current goal in main window
-if st.session_state.savings_goal:
-    st.subheader("Current Savings Goal")
-    st.write(f"Goal: ${st.session_state.savings_goal['amount']:.2f}")
-    st.write(f"Target Date: {st.session_state.savings_goal['date']}")
-else:
-    st.info("No savings goal set. Use the sidebar to set a goal.")
-
-# Input fields for new budget item
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    product = st.text_input("Product")
-
-with col2:
-    amount = st.number_input("Amount", min_value=0.0, step=0.01)
-
-with col3:
-    date = st.date_input("Date", value=datetime.now().date(), key="new_item_date_input")
-
-# Category selection for custom products
-category = get_category(product)
-if product and not category:
-    category = st.selectbox("Category", options=list(st.session_state.product_categories.keys()) + ["Other"])
-
-add_item = st.button("Add Item")
-
-if add_item and product:
-    if not category:
-        category = "Other"
-    new_item = {"Product": product, "Amount": amount, "Category": category, "Date": date}
-    st.session_state.budget_items.append(new_item)
-    df = pd.DataFrame(st.session_state.budget_items)
-    save_budget_data(df)
-    
-    # Add new product to category if it's not already there
-    if category != "Other":
-        if category not in st.session_state.product_categories:
-            st.session_state.product_categories[category] = []
-        if product.lower() not in st.session_state.product_categories[category]:
-            st.session_state.product_categories[category].append(product.lower())
-            save_product_categories(st.session_state.product_categories)
-    
-    st.success(f"Item added successfully! Category: {category}")
-    # Reset the product input
-    product = ""
-
-# Process recurring expenses
-process_recurring_expenses()
-
-# Display budget items
-display_budget_items()
 
 display_budget_vs_actual()
+add_new_item()
+process_recurring_expenses()
 display_pie_chart()
 display_spending_chart()
 
-display_savings_goal_progress()
+
 
 if 'recurring_expenses' in st.session_state:
     st.subheader("Recurring Expenses")
@@ -458,8 +479,12 @@ if 'recurring_expenses' in st.session_state:
     st.dataframe(rec_df)
 
 st.markdown("---")  # Add a separator
+st.title("🐷Savings")
+display_savings_goal_progress()
 add_to_savings()
 
 # Add an option to export data
-if st.button("Export Data"):
+st.markdown("---")  # Add a horizontal rule
+st.subheader("Data Export")
+if st.button("Create Data Export"):
     export_data()
