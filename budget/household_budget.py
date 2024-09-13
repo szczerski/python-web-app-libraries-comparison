@@ -59,7 +59,8 @@ def init_db():
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   username TEXT UNIQUE NOT NULL,
                   email TEXT UNIQUE NOT NULL,
-                  password TEXT NOT NULL)''')
+                  password TEXT NOT NULL,
+                  currency TEXT DEFAULT '$')''')
     conn.commit()
     conn.close()
 
@@ -76,7 +77,6 @@ def add_user(username, email, password):
         conn.commit()
         return True
     except sqlite3.IntegrityError:
-        # This will catch duplicate username or email
         return False
     finally:
         conn.close()
@@ -98,7 +98,17 @@ def show_signup_form():
             else:
                 if add_user(username, email, password):
                     st.success(f"Account created for {username}!")
-                    st.session_state.signed_up = True
+                    # Automatically log in the user
+                    st.session_state.logged_in = True
+                    st.session_state.username = username
+                    st.session_state.show_signup_form = False
+                    # Fetch the user's currency from the database
+                    conn = sqlite3.connect(DB_FILE)
+                    c = conn.cursor()
+                    c.execute("SELECT currency FROM users WHERE username = ?", (username,))
+                    user_currency = c.fetchone()[0]
+                    conn.close()
+                    st.session_state.currency = user_currency
                     st.experimental_rerun()
                 else:
                     st.error("Username or email already exists.")
@@ -149,13 +159,14 @@ if 'settings' not in st.session_state:
     st.session_state.settings = load_settings()
 
 def format_currency(amount):
-    currency = st.session_state.settings['currency']
+    currency = st.session_state.get('currency', '$')
     formatted_amount = f"{amount:.2f}"
     
     if currency in CURRENCIES_BEFORE:
         return f"{currency}{formatted_amount}"
     else:
         return f"{formatted_amount} {currency}"
+
 
 def add_new_item():
     col1, col2 = st.columns(2)
@@ -606,13 +617,18 @@ def display_spending_restrictions():
 def set_currency():
     st.sidebar.subheader("💱 Set Currency")
     currencies = ['$', '€', '£', '¥', '₹', 'A$', 'C$', 'S$', 'CHF', 'zł', 'kr', 'R$', '₽', '₱', '₺', 'Kč', 'Ft', '₪', 'د.إ', '₩', '₫']
-    current_currency = st.session_state.settings.get('currency', '$')
+    current_currency = st.session_state.get('currency', '$')
     selected_currency = st.sidebar.selectbox("Select Currency", currencies, index=currencies.index(current_currency))
     
-    if selected_currency != current_currency:
-        st.session_state.settings['currency'] = selected_currency
-        save_settings(st.session_state.settings)
+    if selected_currency != current_currency and st.session_state.get('logged_in', False):
+        st.session_state.currency = selected_currency
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute("UPDATE users SET currency = ? WHERE username = ?", (selected_currency, st.session_state.username))
+        conn.commit()
+        conn.close()
         st.sidebar.success(f"Currency updated to {selected_currency}")
+
 
 
 # Sidebar
