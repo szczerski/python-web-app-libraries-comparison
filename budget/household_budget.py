@@ -322,25 +322,20 @@ def manage_spending_restrictions():
     st.sidebar.markdown("---")  # Horizontal rule
 
 def display_budget_items():
+    st.subheader("📜 Budget Items History")
+
     if st.session_state.budget_items:
         df = pd.DataFrame(st.session_state.budget_items)
         df['Date'] = pd.to_datetime(df['Date']).dt.date
-        # df['Amount'] = df['Amount'].round(2)
-        st.dataframe(
-            df.style
-            .format({
-                "Amount": "${:.2f}",
-                "Date": lambda x: x.strftime("%Y-%m-%d")
-            })
-        )
         
-        st.subheader("📜 Budget Items History")
+        def color_savings(val):
+            color = 'green' if val == 'Savings' else ''
+            return f'color: {color}'
         
-        # Function to determine row color
-        def highlight_row(row):
+        def color_amount(val, row):
             if row['Product'] == 'Savings':
-                return ['background-color: lightgreen'] * len(row)
-            elif 'spending_restrictions' in st.session_state and row['Product'] in st.session_state.spending_restrictions:
+                return 'color: green'
+            elif row['Product'] in st.session_state.spending_restrictions:
                 restriction = st.session_state.spending_restrictions[row['Product']]
                 if restriction['period'] == 'Daily':
                     total_spent = df[(df['Product'] == row['Product']) & (df['Date'] == row['Date'])]['Amount'].sum()
@@ -352,12 +347,18 @@ def display_budget_items():
                     total_spent = df[(df['Product'] == row['Product']) & (df['Date'] >= month_start) & (df['Date'] <= row['Date'])]['Amount'].sum()
                 
                 if total_spent > restriction['limit']:
-                    return ['background-color: lightcoral'] * len(row)
-            return [''] * len(row)
+                    return 'color: red'
+            return ''
         
-        # Apply the styling
-        styled_df = df.style.apply(highlight_row, axis=1)
-        st.dataframe(styled_df)
+        st.dataframe(
+            df.style
+            .format({
+                "Amount": "${:.2f}",
+                "Date": lambda x: x.strftime("%Y-%m-%d")
+            })
+            .applymap(color_savings, subset=['Product'])
+            .apply(lambda row: [color_amount(val, row) for val in row], axis=1)
+        )
         
         # Calculate and display total
         total = df["Amount"].sum()
