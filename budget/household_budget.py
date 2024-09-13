@@ -12,6 +12,8 @@ import base64
 
 # Set page title
 st.set_page_config(page_title="🏠 Household Budget App")
+st.sidebar.header("⚙️ Settings")
+
 
 # Define all functions at the beginning of the script
 
@@ -160,6 +162,7 @@ def save_spending_restrictions(restrictions):
     df.to_csv(SPENDING_RESTRICTIONS_CSV, index=False)
 
 def set_monthly_budget():
+    st.sidebar.markdown("---")
     st.sidebar.subheader("💰 Set Monthly Budget")
     monthly_budget = st.sidebar.number_input("Monthly Budget", min_value=0.0, step=10.0, value=st.session_state.monthly_budget)
     if st.sidebar.button("Save Budget"):
@@ -393,7 +396,7 @@ def display_budget_items():
         
         # Calculate and display total
         total = df["Amount"].sum()
-        st.subheader(f"Total Budget: {format_currency(total)}")
+        st.markdown(f"***Sum of spendings: {format_currency(total)}***")
     else:
         st.info("No budget items added yet.")
 
@@ -540,13 +543,20 @@ set_currency()
 display_budget_vs_actual()
 add_new_item()
 process_recurring_expenses()
-display_pie_chart()
-display_spending_chart()
+
+st.markdown("---")
+st.title("💸 Spendings")
+col1, col2 = st.columns(2)
+with col1:
+    display_pie_chart()
+with col2:
+    display_spending_chart()
 
 
 
 if 'recurring_expenses' in st.session_state:
-    st.subheader("Recurring Expenses")
+    st.markdown("---")
+    st.subheader("🔄 Recurring Expenses")
     rec_df = pd.DataFrame(st.session_state.recurring_expenses)
     
     # Format the 'Amount' column with currency
