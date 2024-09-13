@@ -11,10 +11,37 @@ import io
 import base64
 
 # Set page title
-st.set_page_config(page_title="Household Budget App")
+st.set_page_config(page_title="🏠 Household Budget App")
 
 # Define all functions at the beginning of the script
 
+# File path for settings CSV
+SETTINGS_CSV = "app_settings.csv"
+
+# Currencies with symbols before the amount
+CURRENCIES_BEFORE = {'$', '€', '£', '¥', '₹', 'A$', 'C$', 'S$', 'CHF'}
+
+def load_settings():
+    if os.path.exists(SETTINGS_CSV):
+        settings = pd.read_csv(SETTINGS_CSV, index_col=0).to_dict()['value']
+        return settings
+    return {'currency': '$'}  # Default settings
+
+def save_settings(settings):
+    pd.DataFrame({'value': settings}, index=settings.keys()).to_csv(SETTINGS_CSV)
+
+# Initialize settings in session state
+if 'settings' not in st.session_state:
+    st.session_state.settings = load_settings()
+
+def format_currency(amount):
+    currency = st.session_state.settings['currency']
+    formatted_amount = f"{amount:.2f}"
+    
+    if currency in CURRENCIES_BEFORE:
+        return f"{currency}{formatted_amount}"
+    else:
+        return f"{formatted_amount} {currency}"
 
 def add_new_item():
     col1, col2 = st.columns(2)
@@ -158,7 +185,7 @@ def export_data():
     csv = df.to_csv(index=False)
     b64 = base64.b64encode(csv.encode()).decode()
     href = f'<a href="data:file/csv;base64,{b64}" download="budget_data.csv">Download CSV File</a>'
-    st.markdown(href, unsafe_allow_html=True)
+    st.sidebar.markdown(href, unsafe_allow_html=True)
 
 def add_recurring_expense():
     st.sidebar.subheader("🔄 Add Recurring Expense")
@@ -223,12 +250,12 @@ def add_to_savings():
                 total_savings = df[df['Product'] == 'Savings']['Amount'].sum()
                 goal = st.session_state.savings_goal
                 if total_savings >= goal['amount']:
-                    st.success(f"${savings_amount:.2f} added to savings! Congratulations! You've reached your savings goal!")
+                    st.success(f"{format_currency(savings_amount)} added to savings! Congratulations! You've reached your savings goal!")
                 else:
                     remaining = goal['amount'] - total_savings
-                    st.success(f"${savings_amount:.2f} added to savings! ${remaining:.2f} left to reach your goal.")
+                    st.success(f"{format_currency(savings_amount)} added to savings! {format_currency(remaining)} left to reach your goal.")
             else:
-                st.success(f"${savings_amount:.2f} added to savings!")
+                st.success(f"{format_currency(savings_amount)} added to savings!")
             
             # Force a rerun to update the display
             st.experimental_rerun()
@@ -269,6 +296,8 @@ def process_recurring_expenses():
         st.session_state.last_recurring_check = today
 
 def display_savings_goal_progress():
+    st.markdown("---")  # Add a separator
+    st.title("🐷Savings")
     if 'savings_goal' in st.session_state and st.session_state.savings_goal is not None:
         st.subheader("Savings Goal Progress")
         goal = st.session_state.savings_goal
@@ -281,7 +310,7 @@ def display_savings_goal_progress():
             
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.write(f"Saved: ${total_savings:.2f} / ${goal['amount']:.2f}")
+                st.write(f"Saved: {format_currency(total_savings)} / {format_currency(goal['amount'])}")
             with col2:
                 st.write(f"Target Date: {st.session_state.savings_goal['date']}")
             with col3:
@@ -292,7 +321,7 @@ def display_savings_goal_progress():
                 st.success("Congratulations! You've reached your savings goal!")
             elif days_left > 0:
                 daily_savings_needed = (goal['amount'] - total_savings) / days_left
-                st.info(f"To reach your goal, you need to save ${daily_savings_needed:.2f} per day.")
+                st.info(f"To reach your goal, you need to save {format_currency(daily_savings_needed)} per day.")
         else:
             st.write("Savings goal amount is not set or is zero.")
     else:
@@ -313,7 +342,7 @@ def manage_spending_restrictions():
         if st.sidebar.button("Set Restriction"):
             st.session_state.spending_restrictions[product] = {"limit": limit, "period": period}
             save_spending_restrictions(st.session_state.spending_restrictions)
-            st.sidebar.success(f"Restriction set for {product}: ${limit} {period.lower()}")
+            st.sidebar.success(f"Restriction set for {product}: {format_currency(limit)} {period.lower()}")
 
     if st.sidebar.button("Clear All Restrictions"):
         st.session_state.spending_restrictions.clear()
@@ -327,6 +356,8 @@ def display_budget_items():
     if st.session_state.budget_items:
         df = pd.DataFrame(st.session_state.budget_items)
         df['Date'] = pd.to_datetime(df['Date']).dt.date
+        df.index = range(1, len(df) + 1)
+
         
         def color_savings(val):
             color = 'green' if val == 'Savings' else ''
@@ -353,7 +384,7 @@ def display_budget_items():
         st.dataframe(
             df.style
             .format({
-                "Amount": "${:.2f}",
+                "Amount": lambda x: format_currency(x),
                 "Date": lambda x: x.strftime("%Y-%m-%d")
             })
             .applymap(color_savings, subset=['Product'])
@@ -362,7 +393,7 @@ def display_budget_items():
         
         # Calculate and display total
         total = df["Amount"].sum()
-        st.subheader(f"Total Budget: ${total:.2f}")
+        st.subheader(f"Total Budget: {format_currency(total)}")
     else:
         st.info("No budget items added yet.")
 
@@ -380,9 +411,9 @@ def display_budget_vs_actual():
         remaining_budget = st.session_state.monthly_budget - monthly_spending
         
         col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Monthly Budget", f"${st.session_state.monthly_budget:.2f}")
-        col2.metric("Spent", f"${monthly_spending:.2f}")
-        col3.metric("Remaining", f"${remaining_budget:.2f}")
+        col1.metric("Monthly Budget", format_currency(st.session_state.monthly_budget))
+        col2.metric("Spent", format_currency(monthly_spending))
+        col3.metric("Remaining", format_currency(remaining_budget))
         
         # Create a progress bar to show budget remaining
         progress = remaining_budget / st.session_state.monthly_budget
@@ -429,9 +460,49 @@ def display_spending_chart():
         fig = px.line(df, x='Date', y='Cumulative Sum', title='Cumulative Spending Over Time')
         st.plotly_chart(fig)
 
+def display_spending_restrictions():
+    st.markdown("---") 
+    st.subheader("🚫 Current Spending Restrictions")
+    
+    if st.session_state.spending_restrictions:
+        # Create a DataFrame from the spending restrictions
+        restrictions_df = pd.DataFrame.from_dict(
+            st.session_state.spending_restrictions, 
+            orient='index', 
+            columns=['limit', 'period']
+        ).reset_index()
+        restrictions_df.columns = ['Product', 'Limit', 'Period']
+        
+        # Format the limit as currency
+        restrictions_df['Limit'] = restrictions_df['Limit'].apply(lambda x: format_currency(x))
+        
+        # Display the DataFrame
+        st.dataframe(
+            restrictions_df,
+            column_config={
+                "Product": st.column_config.TextColumn("Product"),
+                "Limit": st.column_config.TextColumn("Limit"),
+                "Period": st.column_config.TextColumn("Period"),
+            },
+            hide_index=True,
+        )
+    else:
+        st.info("No spending restrictions set. Use the sidebar to add restrictions.")
+
+def set_currency():
+    st.sidebar.subheader("💱 Set Currency")
+    currencies = ['$', '€', '£', '¥', '₹', 'A$', 'C$', 'S$', 'CHF', 'zł', 'kr', 'R$', '₽', '₱', '₺', 'Kč', 'Ft', '₪', 'د.إ', '₩', '₫']
+    current_currency = st.session_state.settings.get('currency', '$')
+    selected_currency = st.sidebar.selectbox("Select Currency", currencies, index=currencies.index(current_currency))
+    
+    if selected_currency != current_currency:
+        st.session_state.settings['currency'] = selected_currency
+        save_settings(st.session_state.settings)
+        st.sidebar.success(f"Currency updated to {selected_currency}")
+
 # Main script execution
 
-st.title("Household Budget Tracker")
+st.title("🏠 Household Budget Tracker")
 
 # File paths for CSV
 BUDGET_CSV = "budget_data.csv"
@@ -464,7 +535,7 @@ manage_categories()
 add_recurring_expense()
 set_savings_goal()
 manage_spending_restrictions()
-
+set_currency()
 
 display_budget_vs_actual()
 add_new_item()
@@ -477,15 +548,22 @@ display_spending_chart()
 if 'recurring_expenses' in st.session_state:
     st.subheader("Recurring Expenses")
     rec_df = pd.DataFrame(st.session_state.recurring_expenses)
-    st.dataframe(rec_df)
+    
+    # Format the 'Amount' column with currency
+    rec_df['Amount'] = rec_df['Amount'].apply(format_currency)
+    
+    # Display DataFrame without index
+    st.dataframe(rec_df, hide_index=True)
 
-st.markdown("---")  # Add a separator
-st.title("🐷Savings")
+
+display_spending_restrictions()
+
+
 display_savings_goal_progress()
 add_to_savings()
 
 # Add an option to export data
-st.markdown("---")  # Add a horizontal rule
-st.subheader("Data Export")
-if st.button("Create Data Export"):
+st.sidebar.subheader("📊 Data Export")
+if st.sidebar.button("Create Data Export"):
     export_data()
+
