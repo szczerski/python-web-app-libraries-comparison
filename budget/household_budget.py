@@ -9,19 +9,131 @@ import os
 from datetime import datetime, timedelta
 import io
 import base64
+import sqlite3
+import hashlib
+
 
 # Set page title
 st.set_page_config(page_title="🏠 Household Budget App")
-st.sidebar.header("⚙️ Settings")
+
+def display_sidebar():
+    col1, col2 = st.sidebar.columns(2)
+    if st.session_state.get('logged_in', False):
+        st.sidebar.write(f"Welcome, {st.session_state.username}!")
+        if st.sidebar.button("🚪 Logout"):
+            st.session_state.logged_in = False
+            st.session_state.username = None
+            st.session_state.show_login_form = False
+            st.session_state.show_signup_form = False
+            st.success("You have been logged out successfully.")
+            st.experimental_rerun()
+    else:
+        with col1:
+            if st.button("🔑 Login"):
+                st.session_state.show_login_form = True
+                st.session_state.show_signup_form = False
+        with col2:
+            if st.button("📝 Sign Up"):
+                st.session_state.show_signup_form = True
+                st.session_state.show_login_form = False
 
 
-# Define all functions at the beginning of the script
 
-# File path for settings CSV
+    if st.session_state.get('show_login_form', False):
+        show_login_form()
+
+    if st.session_state.get('show_signup_form', False):
+        show_signup_form()
+
+    st.sidebar.markdown("# ⚙️ Settings")
+
+DB_FILE = 'users.db'
 SETTINGS_CSV = "app_settings.csv"
-
-# Currencies with symbols before the amount
 CURRENCIES_BEFORE = {'$', '€', '£', '¥', '₹', 'A$', 'C$', 'S$', 'CHF'}
+
+
+def init_db():
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS users
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  username TEXT UNIQUE NOT NULL,
+                  email TEXT UNIQUE NOT NULL,
+                  password TEXT NOT NULL)''')
+    conn.commit()
+    conn.close()
+
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def add_user(username, email, password):
+    hashed_password = hash_password(password)
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    try:
+        c.execute("INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
+                  (username, email, hashed_password))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        # This will catch duplicate username or email
+        return False
+    finally:
+        conn.close()
+
+def show_signup_form():
+    with st.sidebar.form("signup_form"):
+        st.write("## 📝 Sign Up")
+        username = st.text_input("Username")
+        email = st.text_input("Email")
+        password = st.text_input("Password", type="password")
+        confirm_password = st.text_input("Confirm Password", type="password")
+        submit_button = st.form_submit_button("Create Account")
+        
+        if submit_button:
+            if not username or not email or not password:
+                st.error("Please fill in all fields.")
+            elif password != confirm_password:
+                st.error("Passwords do not match.")
+            else:
+                if add_user(username, email, password):
+                    st.success(f"Account created for {username}!")
+                    st.session_state.signed_up = True
+                    st.experimental_rerun()
+                else:
+                    st.error("Username or email already exists.")
+
+
+def show_login_form():
+    with st.sidebar.form("login_form"):
+        st.write("## 🔑 Login")
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        submit_button = st.form_submit_button("Log In")
+        
+        if submit_button:
+            if not username or not password:
+                st.error("Please enter both username and password.")
+            else:
+                if verify_user(username, password):
+                    st.session_state.logged_in = True
+                    st.session_state.username = username
+                    st.session_state.show_login_form = False
+                    st.success(f"Logged in as {username}!")
+                    st.experimental_rerun()
+                else:
+                    st.error("Invalid username or password.")
+
+
+
+def verify_user(username, password):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    hashed_password = hash_password(password)
+    c.execute("SELECT * FROM users WHERE username=? AND password=?", (username, hashed_password))
+    user = c.fetchone()
+    conn.close()
+    return user is not None
 
 def load_settings():
     if os.path.exists(SETTINGS_CSV):
@@ -464,8 +576,7 @@ def display_spending_chart():
         st.plotly_chart(fig)
 
 def display_spending_restrictions():
-    st.markdown("---") 
-    st.subheader("🚫 Current Spending Restrictions")
+    st.markdown("##### 🚫 Current Spending Restrictions")
     
     if st.session_state.spending_restrictions:
         # Create a DataFrame from the spending restrictions
@@ -503,6 +614,10 @@ def set_currency():
         save_settings(st.session_state.settings)
         st.sidebar.success(f"Currency updated to {selected_currency}")
 
+
+# Sidebar
+display_sidebar()
+
 # Main script execution
 
 st.title("🏠 Household Budget Tracker")
@@ -529,6 +644,15 @@ if 'savings_goal' not in st.session_state:
 if 'spending_restrictions' not in st.session_state:
     st.session_state.spending_restrictions = load_spending_restrictions()
 
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+if 'username' not in st.session_state:
+    st.session_state.username = None
+if 'show_login_form' not in st.session_state:
+    st.session_state.show_login_form = False
+if 'show_signup_form' not in st.session_state:
+    st.session_state.show_signup_form = False
+
 # Flatten the product list for autocomplete
 all_products = [item for sublist in st.session_state.product_categories.values() for item in sublist]
 
@@ -542,6 +666,7 @@ set_currency()
 
 display_budget_vs_actual()
 add_new_item()
+
 process_recurring_expenses()
 
 st.markdown("---")
@@ -552,21 +677,32 @@ with col1:
 with col2:
     display_spending_chart()
 
+st.markdown("---")
+st.title("💼 Budget Management")
+col1, col2 = st.columns(2)
 
+with col1:
+    if 'recurring_expenses' in st.session_state:
+        st.markdown("##### 🔄 Recurring Expenses")
+        rec_df = pd.DataFrame(st.session_state.recurring_expenses)
+        
+        # Format the 'Amount' column with currency
+        rec_df['Amount'] = rec_df['Amount'].apply(format_currency)
+        
+        # Display DataFrame without index
+        st.dataframe(
+            rec_df,
+            column_config={
+                "Product": st.column_config.TextColumn("Product"),
+                "Amount": st.column_config.TextColumn("Amount"),
+                "Category": st.column_config.TextColumn("Category"),
+                "Frequency": st.column_config.TextColumn("Frequency"),
+            },
+            hide_index=True,
+        )
 
-if 'recurring_expenses' in st.session_state:
-    st.markdown("---")
-    st.subheader("🔄 Recurring Expenses")
-    rec_df = pd.DataFrame(st.session_state.recurring_expenses)
-    
-    # Format the 'Amount' column with currency
-    rec_df['Amount'] = rec_df['Amount'].apply(format_currency)
-    
-    # Display DataFrame without index
-    st.dataframe(rec_df, hide_index=True)
-
-
-display_spending_restrictions()
+with col2:
+    display_spending_restrictions()
 
 
 display_savings_goal_progress()
@@ -576,4 +712,23 @@ add_to_savings()
 st.sidebar.subheader("📊 Data Export")
 if st.sidebar.button("Create Data Export"):
     export_data()
+
+
+def main():
+    if not os.path.exists(DB_FILE):
+        init_db()
+    
+    st.title("🏠 Household Budget Tracker")
+    display_sidebar()
+
+    if st.session_state.get('logged_in', False):
+        st.write(f"Welcome to your budget tracker, {st.session_state.username}!")
+    else:
+        st.write("Please log in or sign up to use the budget tracker.")
+
+
+if __name__ == "__main__":
+    main()
+
+
 
