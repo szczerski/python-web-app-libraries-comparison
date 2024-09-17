@@ -151,7 +151,7 @@ def get_auth_cookie():
 
 
 def clear_auth_cookie():
-    st.experimental_set_query_params(cookie=None)
+    st.query_params.pop("cookie", None)
 
 
 def check_session():
@@ -738,7 +738,7 @@ def display_budget_items():
 
     if st.session_state.budget_items:
         df = pd.DataFrame(st.session_state.budget_items)
-        df["Date"] = pd.to_datetime(df["Date"]).dt.date
+        df["Date"] = pd.to_datetime(df["Date"])  # Convert to Timestamp
         df.index = range(1, len(df) + 1)
 
         def color_savings(val):
@@ -750,12 +750,15 @@ def display_budget_items():
                 return "color: green"
             elif row["Product"] in st.session_state.spending_restrictions:
                 restriction = st.session_state.spending_restrictions[row["Product"]]
+                date = pd.Timestamp(row["Date"])
+
                 if restriction["period"] == "Daily":
                     total_spent = df[
                         (df["Product"] == row["Product"]) & (df["Date"] == row["Date"])
                     ]["Amount"].sum()
                 elif restriction["period"] == "Weekly":
-                    week_start = row["Date"] - pd.Timedelta(days=row["Date"].dayofweek)
+                    date = pd.Timestamp(row["Date"])
+                    week_start = date - pd.Timedelta(days=date.dayofweek)
                     total_spent = df[
                         (df["Product"] == row["Product"])
                         & (df["Date"] >= week_start)
