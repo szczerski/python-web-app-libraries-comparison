@@ -15,6 +15,7 @@ import hashlib
 import uuid
 from http.cookies import SimpleCookie
 
+
 # Set page title
 st.set_page_config(page_title="🏠 Household Budget App")
 
@@ -738,7 +739,7 @@ def display_budget_items():
 
     if st.session_state.budget_items:
         df = pd.DataFrame(st.session_state.budget_items)
-        df["Date"] = pd.to_datetime(df["Date"])  # Convert to Timestamp
+        df["Date"] = pd.to_datetime(df["Date"])
         df.index = range(1, len(df) + 1)
 
         def color_savings(val):
