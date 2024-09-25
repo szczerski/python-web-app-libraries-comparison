@@ -1,5 +1,14 @@
-# python-web-app-libraries-comparison
-A comprehensive comparison and tutorial repository exploring popular Python web application frameworks and UI libraries such as Streamlit, Taipy, Flet, Reflex, and more. Learn the strengths, weaknesses, and use cases of each library through detailed code examples and project-based tutorials.
+A comprehensive comparison and tutorial repository exploring popular Python web application frameworks and UI libraries.
+
+# Background Remover
+Streamlit offers a straightforward approach to creating a background remover application with its intuitive file uploader and image display components. It provides a clean, columnar layout and a built-in download button for easy user interaction. Taipy, while requiring more setup code, offers greater control over the UI layout and file handling process. It uses a custom file selector and provides more detailed notifications about the processing and saving of images. While Streamlit excels in rapid prototyping and ease of use, Taipy provides more flexibility for complex interactions and custom UI designs.
+
+![background_remover](assets/background_remover.png)
+![background_remover](assets/background_remover.gif)
+
+## Code:
+- Streamlit: [background_remover - Streamlit](./background_remover_Streamlit.py)
+- Taipy: [background_remover - Taipy](./background_remover_Taipy.py)
 
 # Slider
 Streamlit allows for quick and easy slider creation with minimal code but tends to be slower in performance. Taipy requires more code but offers JavaScript-level speed and efficiency. Overall, Streamlit is ideal for rapid prototyping, while Taipy is better suited for performance-focused applications.
