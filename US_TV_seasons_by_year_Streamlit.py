@@ -1,17 +1,15 @@
-import requests
-from bs4 import BeautifulSoup
 import streamlit as st
 import pandas as pd
-import numpy as np
+# import numpy as np
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.statespace.sarimax import SARIMAX
-from pmdarima import auto_arima
+# from pmdarima import auto_arima
 from sklearn.metrics import mean_squared_error
 from math import sqrt
 import warnings
-from sklearn.preprocessing import PolynomialFeatures
-from sklearn.linear_model import Ridge
-from sklearn.pipeline import make_pipeline
+# from sklearn.preprocessing import PolynomialFeatures
+# from sklearn.linear_model import Ridge
+# from sklearn.pipeline import make_pipeline
 
 
 # Dictionary to store year and number of seasons
