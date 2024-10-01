@@ -1,0 +1,15 @@
+.highlight-row {
+  /* background-color: #313f73; */
+  /* background-color: #baba1a; */
+  background-color: #DAA520; 
+
+}
+body {
+  background-color: #152335;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
